@@ -1,0 +1,497 @@
+<!DOCTYPE HTML>
+<html lang="ko">
+<head>
+     <title>상담 페이지</title>
+     <meta charset="utf-8">
+     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+     <script src="/socket.io/socket.io.js"></script>
+     <script type="text/javascript">
+
+     window.onload = function(){
+
+          var id = '';
+          var pw = '';
+          var host;
+          var consultant;
+          var customer;
+          var set=0;;
+          var index;
+          var to;
+          var count =0;
+          // var info = '<p> 사용자정보 : '+ id +'</p>';
+          // $(info).appendTo('#info');
+          $('#uid').val(id);
+
+
+          var room;// prompt( '방 이름을 입력하세요.', 'room' );
+          var socket = io.connect(); //소켓서버 연결
+
+          socket.on( 'message', function(data){
+               var output = '<p>[' + data.id +'] : ' + data.message + '(' + data.date + ')</p>';
+               $( output ).appendTo('#text');
+
+
+          });
+          socket.on( 'list', function(data){
+               //var output = '<p>' + data.date.getFullYear()+'년 '+data.date.getMonth()+'월 ' +data.date.getDate()+'일 '+ '상담내역    <br>상담원(' + data.consultant+') </p> <p>' + data.text + '</p><br>';
+               //var date = new Date(data.date);
+               //date = data.date;
+               var output = '<p>'+ data.text+'<P>';
+               $( output ).appendTo('#list');
+
+          });
+
+          socket.on('login', function(data){
+               id = data.userid;
+               pw = data.pw;
+               host = data.host;
+               if(host==0){customer=id;}
+               if(host==1){consultant=id;}
+               //room = data.index;
+
+               $('#uid').val(id);
+               var out;
+               if(data.host==1){
+                    out = ' 상담원 : ' + id;
+                    $('#info2').attr("style","overflow-x:hidden");
+                    $('#sel').attr("style","display:none");
+                    $('#que').attr("type","text");
+               //     socket.emit('getQue', consultant);
+                    var date = new Date();
+                    socket.emit('listStart', {
+                         consultant : consultant,
+                         date : date
+                    });
+               }else{
+                    out = ' 고객 : ' + id;
+                    $('#sel').attr("style","display:inline");
+                    $('#que').attr("type","hidden");
+                    $('#request').attr("placeholder","질문사항을 입력해주세요");
+                    //$('#info2').attr("style","border:0px;background-color:transparent;overflow-y:hidden;overflow-x:hidden");
+
+               }
+
+               $('#inputId').attr("type","hidden");
+               $('#inputPw').attr("type","hidden");
+               $('#login').attr("type","hidden");
+               $('#in').attr("type","button");
+
+               if(host==0){
+                    $('#in').attr("value","상담 요청");
+               }
+               if(host==1){
+                    $('#select').attr("type","hidden");
+                    $('#in').attr("value","상담 시작");
+               }
+               $('#logout').attr("type","button");
+               $('#loginInfo').val(out +'님 환영합니다.');
+
+               //socket.emit( 'list' , id );
+               socket.emit('stat', host);
+
+          });
+          socket.on('loginFail', function(data){
+               alert("아이디와 비밀번호를 확인해주세요.");
+          });
+          socket.on('listFail', function(data){
+               $('#list').val("고객님의 과거 상담내역이 없습니다.");
+          });
+
+          socket.on('stat', function(data){
+               if(host ==1){
+                    var out = '  대기자 수 : ' +data.wait + '명    상담원 수 : '+ data.consultant +'명';
+
+                    $('#que').val(out+'\n');
+
+                    //socket.emit('count');
+               }
+          });
+          socket.on('countStart',function(data){
+               if(host ==1){
+                    var out = '<p>' + ' 상담원별 시간당 처리 속도'+ '<p>';
+                    $( out ).appendTo('#request');
+
+               }
+          });
+          socket.on('count', function(data){
+               if(host ==1){
+                    var out = '<p>' +data.consultant +' : '+data.a+'<p>';
+                    $( out ).appendTo('#request');
+
+               }
+          });
+
+          socket.on('getCustomer', function(data){
+               customer = data.userid;
+               room = data.index;
+
+               socket.emit( 'join', room);
+               var out = '고객 '+ customer+'님과 상담이 연결되었습니다.';
+               $('#text').val(out);
+               $('#in').attr("type","hidden");
+
+               // socket.emit('toCustomer', {
+               //      customer : customer,
+               //      consultant : id,
+               //      room : room
+               // });
+               socket.emit('deleteRoom',{
+                    room : room,
+                    consultant : consultant
+               });
+
+               socket.emit('getInfo',{
+                    consultant : consultant,
+                    customer : customer
+               })
+               socket.emit( 'list' , customer );
+
+          });
+
+          // socket.on('toCustomer', function(data){
+          //      var out = '<p>상담원 '+ consultant+ room +'님과 상담이 연결되었습니다.</P>';
+          //      $( out ).appendTo('#text');
+          //      if(id == data.customer){
+          //           consultant = data.consultant;
+          //           room = data.room;
+          //           socket.emit( 'join', room);
+          //           var out = '<p>상담원 '+ consultant+'님과 상담이 연결되었습니다.</P>';
+          //           $( out ).appendTo('#text');
+          //      }
+          // });
+
+          socket.on('onMakeRoom', function(data){
+               room = data.index;
+               socket.emit( 'join', room);
+               // socket.emit('deleteRoom',{
+               //      room : room,
+               //      consultant : consultant
+               // });
+
+          });
+          socket.on('onMakeRoom2', function(data){
+               consultant = data.consultant;
+               socket.emit( 'putConsultant', {
+                    room : room,
+                    consultant : consultant
+               });
+               var req = $('#request').val();
+               var sel = $("#sel option:selected").val();
+               var date = new Date();
+               socket.emit( 'toConsultant', {
+                    room : room,
+                    consultant : consultant,
+                    customer : customer,
+                    request : req,
+                    sel : sel,
+                    date : date
+               });
+
+          });
+          socket.on('toConsultant', function(data){
+               if(id == data.consultant){
+                    var out = '<p> 다음 상담요청 내역입니다.<br><br>상담고객 : '+data.customer+ '<br>상담분야 : '+data.sel+'<br>상담내용 : '+data.request + '<br>상담요청일자 : '+data.date+'</p>';
+                    $( out ).appendTo('#info');
+               }
+
+          });
+          socket.on('getInfo', function(data){
+               if(host==1){
+                    var out = '<p> 고객정보<br><br>'+'고객 : '+data.name+'<br>고객사 : '+data.company+'<br>가입 서비스 : '+data.service+'<br>가입일 : '+data.signdate+ '</P>';
+                    $('#info').val("");
+                    $( out ).appendTo('#info');
+
+                    $('#out').attr("type","button");
+
+               }
+          });
+          socket.on('getInfo2', function(data){
+               if(host==0){
+                    consultant=data.userid;
+                    var out = '<p> 상담원 정보<br><br>상담원 : '+data.name+'<br>상담분야 : '+data.special+ '</P>';
+                    $( out ).appendTo('#info');
+
+                    out = '<p>'+data.name+' 상담원과 연결되었습니다.</P>';
+                    $( out ).appendTo('#text');
+                    $('#out').attr("type","button");
+
+                    var date = new Date();
+                    var text = '<p>'+date.toLocaleDateString()+' 상담원(' + consultant+')과 상담한 내용입니다.';
+
+                    var sel = $("#sel option:selected").val();
+                    var sel2 = $("#request").val();
+                    var date2 = date.toLocaleDateString() + ' (' + date.toLocaleTimeString() + ')'
+                    // $( '<p>'+sel+'</p>' ).appendTo('#info2');
+
+                    socket.emit('listIn', {
+                         userid : id,
+                         text : text,
+                         consultant : consultant,
+                         date : date,
+                         category : sel,
+                         request : sel2,
+                         date2 : date2
+                    });
+
+                    socket.emit( 'getRequest', customer);
+
+               }
+
+          });
+
+          socket.on('getRequest', function(data){
+               if(host==1){
+                    var out = '<p>상담고객 : '+data.userid+ '<br>상담분야 : '+data.category+'<br>상담내용 : '+data.request + '<br>상담일자 : '+data.date+'</p> ';
+
+                    // $('#info2').val(out);
+                    $( out ).appendTo('#info2');
+               }
+
+          });
+
+          socket.on('getRequestStart', function(data){
+               if(host==1){
+                    var out = '<p><br> 이번 상담요청 내역입니다.<br><br>상담고객 : '+data.userid+ '<br>상담분야 : '+data.category+'<br>상담내용 : '+data.request + '<br>상담일자 : '+data.date+'</p> ';
+
+                    $( out ).appendTo('#info');
+               }
+          });
+
+          socket.on('getQue', function(data){
+
+               socket.emit( 'getQue2', {
+                    userid : data.userid
+               });
+
+          });
+          socket.on('getQue2', function(data){
+
+               var out = '<p> 다음 상담요청 내역입니다.<br><br>상담고객 : '+data.userid+ '<br>상담분야 : '+data.category+'<br>상담내용 : '+data.request + '<br>상담요청일자 : '+data.date+'</p>';
+               $( out ).appendTo('#info');
+               //$('#info').val(out);
+
+          });
+
+          socket.on('onMessage', function(data){
+               if(host ==1){
+                    var out = '<p>고객 '+ data+ '님과 채팅이 연결되었습니다.</P>';
+                    $( out ).appendTo('#text');
+               }
+          });
+
+          socket.on('findRoom', function(data){
+               room=data.room;
+               consultant = data.userid;
+               socket.emit( 'join', room);
+               socket.emit('list', id);
+               $( '<p>안녕하세요. <br>상담원 '+data.userid + ' 입니다. '+ room +'번 방 </P>'  ).appendTo('#text');
+               socket.emit('start', id);
+               socket.emit('deleteRoom',{
+                    room : room,
+                    consultant : consultant
+               });
+          });
+
+          socket.on('findCustomerFail', function(data){
+               var out = '<p>대기 중인 고객이 없습니다.</P>';
+               $( out ).appendTo('#text');
+
+          });
+
+          socket.on('getRequestFail',function(data){
+               var out = '<p>'+' 고객님의 과거 상담내역이 없습니다. '+'</p>';
+               $( out ).appendTo('#info2');
+
+          });
+          socket.on('getRequestOn',function(data){
+               if(host ==1){
+                    var out = '<p>'+' 고객님의 과거 상담내역 리스트입니다. '+'</p>';
+                    $( out ).appendTo('#info2');
+               }
+          });
+          socket.on('onlineCheck',function(data){
+               var date = new Date();
+               socket.emit('makeRoom',{
+                         userid : id,
+                         date : date
+               });
+
+               $( '<p>상담원을 기다리고 있습니다.</P>' ).appendTo('#text');
+               $('#in').attr("type","hidden");
+               $('#out').attr("type","button");
+
+          });
+          socket.on('onlineCheckFail',function(data){
+               alert('상담 중인 상담원이 없습니다.');
+          });
+
+
+
+          // socket.on('start', function(data){
+          //      $( '<p>고객님과 연결되었습니다.</P>').appendTo('#text');
+          // });
+
+          $('#button').click(function(){
+
+               var uid = $('#uid').val();
+               var msg = $('#msg').val();
+
+               //서버측 'message' 이벤트를 호출한다. 이때 msg 전달
+               socket.emit('message', {
+                    id : id,
+                    message : msg,
+                    date : new Date().toLocaleTimeString()
+               }); //서버측 'message' 이벤트를 호출한다. 이때 msg 전달
+
+
+               var date = new Date();
+               var text = '['+ $('#uid').val() +'] : '+$('#msg').val() + ' (' + date.toLocaleTimeString()+')';
+
+               //date = date.toLocaleDateString();
+               //var out = date.getFullYear()+'-' +date.getMonth() +'-' + date.getDate()+ ' ' +date.getHours()+':'+date.getMinutes()+':'+date.getSeconds();
+               //var out = date.getFullYear()+'년 ' +date.getMonth() +'월 ' + date.getDate()+'일';
+               socket.emit('listIn', {
+                    userid : customer,
+                    text : text,
+                    consultant : consultant,
+                    date : date
+               });
+
+               var msg = $('#msg').val(''); //메세지 내용 초기화
+
+          });
+
+
+          $('#in').click(function(){
+
+               var sel = $("#sel option:selected").val();
+               var sel2 = $("#request").val();
+               var date = new Date();
+               if(host==0 && sel != "choice" &&  sel2 !=""){
+
+                    socket.emit( 'onlineCheck');
+
+               }else if(host==0 && (sel == "choice" ||  sel2 =="")){
+                    alert("상담분야와 질문사항을 입력해주세요.");
+               }
+               if(host==1){
+               //   $( '<p>대기 중인 고객을 찾고 있습니다.</P>' ).appendTo('#text');
+                    socket.emit('findCustomer',{
+                         userid: id
+                    });
+               }
+          });
+
+          $('#out').click(function(){
+
+               $('#inputId').val("");
+               $('#inputPw').val("");
+               $('#list').val("");
+               $('#info').val("");
+               $('#info2').val("");
+               $('#request').val("");
+               $('#text').val("");
+
+               $(function(){
+                    alert("연결이 해제 되었습니다.");
+               });
+               $('#in').attr("type","button");
+               $('#out').attr("type","hidden");
+
+
+               if(host==1){
+                    socket.emit('getQue', {
+                         consultant : consultant
+                    });
+               }
+               socket.leave(room);
+
+          });
+
+          $('#logout').click(function(){
+
+               $(function(){
+                    alert("로그아웃 되었습니다.");
+               });
+
+               socket.emit('logout', {
+                    id : id,
+
+               });
+
+               id = '';
+               pw = '';
+
+               $('#inputId').attr("type","text");
+               $('#inputPw').attr("type","text");
+               $('#login').attr("type","button");
+               $('#inputId').val("");
+               $('#inputPw').val("");
+               $('#loginInfo').val("");
+               $('#uid').val("");
+               $('#list').val("");
+               $('#text').val("");
+               $('#info').val("");
+               $('#info2').val("");
+               $('#request').val("");
+               $('#in').attr("type","hidden");
+               $('#out').attr("type","hidden");
+               $('#logout').attr("type","hidden");
+
+               socket.leave(room);
+          });
+          $('#login').click(function(){
+               id = $('#inputId').val();
+               pw = $('#inputPw').val();
+               set = 0;
+               socket.emit('login', {
+                    id : id,
+                    pw : pw
+               });
+          });
+     };
+
+     // <textarea cols="28" rows="6" id="request" style="overflow:auto" placeholder="질문사항" ></textarea>
+     //<input type="text" id="stat" size="36" value="    " readonly style="border:0px;background-color:transparent"/>
+
+     </script>
+</head>
+<body>
+     <h1>상담 프로그램</h1>
+     <input type ="text" size ="10" id="inputId" placeholder="ID">
+     <input type ="text" size ="15" id="inputPw" placeholder="PW">
+     <input type ="button" id= "login" value="로그인">
+     <input type ="text" size ="35" id="loginInfo" readonly style="border:0px;background-color:transparent">
+     <hr>
+     <textarea cols ="110" rows="25" id="text" name="tex" readonly  ></textarea>
+     <textarea cols ="35" rows="25" id="info" name="tex"  readonly style="overflow-y:auto;overflow-x:hidden"></textarea>
+     <textarea cols ="35" rows="25" id="info2" name="tex"  readonly style="border:0px;background-color:transparent;overflow:hidden"></textarea>
+     <p>
+          <input type="text" size="12" id="uid" dir="rtl" readonly >
+          <input type="text" id="msg" size="120" />
+          <input type="button" id="button" value="전송" />
+          <input type="hidden" id="que" value="" size="30" readonly style="border:0px;background-color:transparent" />
+          <select id="sel" name="sel" >
+               <option value="choice" name="choice">상담분야 선택</option>
+               <option value="공인인증서비스" name="공인인증서비스">공인인증서비스</option>
+               <option value="무역서비스">무역서비스</option>
+               <option value="물류서비스">물류서비스</option>
+          </select>
+     </p>
+     <p>
+
+          <textarea cols ="110" rows="10" id="list" name="tex" style="overflow-y:auto;overflow-x:hidden" readonly></textarea>
+
+
+          <textarea cols ="28" rows="10" id="request" name="tex"  style="overflow-y:auto;overflow-x:hidden;vertical-align:top" ></textarea>
+
+          <input type="text" id="nothing" size="148" readonly style="border:0px;background-color:transparent"/>
+               <input type ="button" id="in" value="상담" />
+               <input type ="hidden" id="out"  value="상담 종료" />
+               <input type ="button" id="logout" value="로그아웃"/>
+
+
+          <!-- <div id="content"></div> -->
+     </p>
+</body>
+</html>
